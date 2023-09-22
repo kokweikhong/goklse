@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+
+    <link rel="stylesheet" href="/static/css/style.css" />
+    <link rel="stylesheet" href="/static/vendor/datatable/datatables.min.css" />
+    <link
+      rel="stylesheet"
+      href="/static/vendor/datatable/fixedColumns.min.css"
+    />
+  </head>
+
+  <body>
+    <main class="container mx-auto px-4">
+      <button
+        hx-get="/stock"
+        hx-target="#stock-list"
+        hx-trigger="click, load delay:1s"
+        hx-swap="innerHTML"
+        hx-indicator="#stock-list-indicator"
+        hx-on:htmx:after-request="createStockListTable()"
+        class="btn btn-primary"
+      >
+        Get Stock List
+        <span
+          id="stock-list-indicator"
+          class="stock-list-indicator loading loading-spinner loading-md"
+        ></span>
+      </button>
+
+      <div class="divider"></div>
+
+      <div id="stock-list"></div>
+    </main>
+    <script src="/static/js/jquery-3.7.1.min.js"></script>
+    <script src="/static/js/index.js"></script>
+    <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/vendor/datatable/datatables.min.js"></script>
+    <script src="/static/vendor/datatable/fixedColumns.min.js"></script>
+  </body>
+</html>

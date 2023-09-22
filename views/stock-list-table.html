@@ -1,0 +1,56 @@
+<div class="card">
+  <div class="card-body">
+    <h2 class="card-title mb-8">Stock List</h2>
+    <table id="stock-list-table" class="order-column row-border table table-xs">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>ShortName</th>
+          <th>Code</th>
+          <th>Category</th>
+          <th>SubCategory</th>
+          <th>Market</th>
+          <th>Price</th>
+          <th>ChangePercent</th>
+          <th>FiftyTwoWeekLow</th>
+          <th>FiftyTwoWeekHigh</th>
+          <th>Volume</th>
+          <th>EPS</th>
+          <th>DPS</th>
+          <th>NTA</th>
+          <th>PE</th>
+          <th>PTBV</th>
+          <th>DY</th>
+          <th>ROE</th>
+          <th>MarketCapInMillions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {{ range .StockList }}
+        <tr class="whitespace-nowrap">
+          <td>{{ .Name }}</td>
+          <td>{{ .ShortName }}</td>
+          <td>{{ .Code }}</td>
+          <td>{{ .Category }}</td>
+          <td>{{ .SubCategory }}</td>
+          <td>{{ .Market }}</td>
+          <td>{{ .Price }}</td>
+          <td>{{ .ChangePercent }}</td>
+          <td>{{ .FiftyTwoWeekLow }}</td>
+          <td>{{ .FiftyTwoWeekHigh }}</td>
+          <td>{{ .Volume }}</td>
+          <td>{{ .EPS }}</td>
+          <td>{{ .DPS }}</td>
+          <td>{{ .NTA }}</td>
+          <td>{{ .PE }}</td>
+          <td>{{ .PTBV }}</td>
+          <td>{{ .DY }}</td>
+          <td>{{ .ROE }}</td>
+          <td>{{ .MarketCapInMillions }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>

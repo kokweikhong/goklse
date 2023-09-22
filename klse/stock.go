@@ -28,7 +28,7 @@ func GetStockListing() []*types.StockQuote {
 			switch tdIndex {
 			case 0:
 				quote.ShortName = strings.Replace(el.Text, "[s]", "", -1)
-				quote.ShortName = strings.TrimSpace(quote.Name)
+				quote.ShortName = strings.TrimSpace(quote.ShortName)
 
 				quote.Name = el.Attr("title")
 				quote.Name = strings.TrimSpace(quote.Name)

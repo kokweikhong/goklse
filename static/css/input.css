@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  .stock-list-indicator {
+    @apply !hidden;
+  }
+  .htmx-request .stock-list-indicator {
+    @apply !inline;
+  }
+  .htmx-request.stock-list-indicator {
+    @apply !inline;
+  }
+}
