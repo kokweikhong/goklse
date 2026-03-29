@@ -2,9 +2,10 @@ package klsescreener
 
 import (
 	"context"
-	"fmt"
+	"strings"
+	"time"
 
-	"github.com/chromedp/cdproto/cdp"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/chromedp"
 )
 
@@ -26,9 +27,6 @@ type QuarterlyFinancialReport struct {
 	ReportLink    string
 }
 
-type AnnualFinancialReport struct {
-}
-
 func GetQuarterlyFinancialReports(ctx context.Context, stockCode string) ([]*QuarterlyFinancialReport, error) {
 	url := financialReportBaseURL + stockCode
 
@@ -41,85 +39,46 @@ func GetQuarterlyFinancialReports(ctx context.Context, stockCode string) ([]*Qua
 	defer cancel()
 	chromeCtx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
-	nodes := []*cdp.Node{}
+
+	var htmlContent string
 	err := chromedp.Run(chromeCtx,
 		chromedp.Navigate(url),
 		chromedp.WaitVisible(`div#quarter_reports`, chromedp.ByQuery),
-		chromedp.Nodes(`div#quarter_reports table tbody tr`, &nodes, chromedp.ByQueryAll),
+		chromedp.OuterHTML(`div#quarter_reports`, &htmlContent, chromedp.ByQuery),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Only extract if td more than 2
-	fmt.Println("Number of quarterly financial reports found:", len(nodes))
-	for nodeIdx, node := range nodes {
-		fmt.Printf("Processing quarterly financial report: %d/%d\n", nodeIdx+1, len(nodes))
-		// how to check if td more than 2? we can check if the text of the first td colspan is 100, if it is then it means it is not a valid report
-		var colspan string
-		chromedp.Run(chromeCtx,
-			chromedp.AttributeValue(`td:nth-child(1)`, "colspan", &colspan, nil, chromedp.ByQuery, chromedp.FromNode(node)),
-		)
-		if colspan == "100" {
-			fmt.Println("Skipping invalid report with colspan 100")
-			continue
+	// Use goquery to parse the HTML content and extract the financial report data
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return nil, err
+	}
+	doc.Find(`div#quarter_reports table tbody tr`).Each(func(i int, s *goquery.Selection) {
+		// Check if the first td has colspan 100, if yes then skip
+		if colspan, exists := s.Find(`td:nth-child(1)`).Attr("colspan"); exists && colspan == "100" {
+			return
 		}
-		var eps, dps, nta, pl, quarter, qDate, financialYear, announced, roe string
-		if err := chromedp.Run(chromeCtx,
-			chromedp.Text(`td:nth-child(1)`, &eps, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(2)`, &dps, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(3)`, &nta, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(4)`, &pl, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(5)`, &quarter, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(6)`, &qDate, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(7)`, &financialYear, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(8)`, &announced, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(9)`, &roe, chromedp.ByQuery, chromedp.FromNode(node)),
-		); err != nil {
-			fmt.Printf("Skipping row %d: failed to read text cells: %v\n", nodeIdx+1, err)
-			continue
+		eps := parseFloat(s.Find(`td:nth-child(1)`).Text())
+		dps := parseFloat(s.Find(`td:nth-child(2)`).Text())
+		nta := parseFloat(s.Find(`td:nth-child(3)`).Text())
+		pl := parseFloat(s.Find(`td:nth-child(4)`).Text())
+		quarter := trimAndRemoveNewLine(s.Find(`td:nth-child(5)`).Text())
+		qDate := trimAndRemoveNewLine(s.Find(`td:nth-child(6)`).Text())
+		financialYear := trimAndRemoveNewLine(s.Find(`td:nth-child(7)`).Text())
+		announced := trimAndRemoveNewLine(s.Find(`td:nth-child(8)`).Text())
+		roe := trimAndRemoveNewLine(s.Find(`td:nth-child(9)`).Text())
+		reportLink, _ := s.Find(`td:nth-child(13) a[title="Financial Report"]`).Attr("href")
+		if reportLink != "" {
+			reportLink = "https://www.klsescreener.com" + reportLink
 		}
-
-		var linkNodes []*cdp.Node
-		chromedp.Run(chromeCtx,
-			chromedp.Nodes(
-				`td:nth-child(13) a[title="Financial Report"]`,
-				&linkNodes,
-				chromedp.ByQueryAll,
-				chromedp.AtLeast(0),
-				chromedp.FromNode(node),
-			),
-		)
-
-		var reportLink string
-		if len(linkNodes) > 0 {
-			// Node.Attributes is a flat slice: ["href", "/path/...", "title", "Financial Report", ...]
-			attrs := linkNodes[0].Attributes
-			for i := 0; i < len(attrs)-1; i += 2 {
-				if attrs[i] == "href" {
-					reportLink = "https://www.klsescreener.com" + trimAndRemoveNewLine(attrs[i+1])
-					break
-				}
-			}
-		}
-		// Convert eps, dps, nta, pl to float64
-		// and remove new line and trim space for quarter, qDate, financialYear, announced, roe
-		epsFloat := parseFloat(eps)
-		dpsFloat := parseFloat(dps)
-		ntaFloat := parseFloat(nta)
-		plFloat := parseFloat(pl)
-		quarter = trimAndRemoveNewLine(quarter)
-		qDate = trimAndRemoveNewLine(qDate)
-		financialYear = trimAndRemoveNewLine(financialYear)
-		announced = trimAndRemoveNewLine(announced)
-		roe = trimAndRemoveNewLine(roe)
-
 		report := &QuarterlyFinancialReport{
-			EPS:           epsFloat,
-			DPS:           dpsFloat,
-			NTA:           ntaFloat,
+			EPS:           eps,
+			DPS:           dps,
+			NTA:           nta,
 			Revenue:       "",
-			PL:            plFloat,
+			PL:            pl,
 			Quarter:       quarter,
 			QDate:         qDate,
 			FinancialYear: financialYear,
@@ -128,19 +87,74 @@ func GetQuarterlyFinancialReports(ctx context.Context, stockCode string) ([]*Qua
 			ReportLink:    reportLink,
 		}
 		reports = append(reports, report)
-	}
+	})
 
 	return reports, nil
 }
 
-// func parseFloat(s string) float64 {
-// 	// Remove new line and trim space
-// 	s = trimAndRemoveNewLine(s)
-// 	// Remove commas	s = strings.ReplaceAll(s, ",", "")
-// 	// Convert to float64
-// 	f, err := strconv.ParseFloat(s, 64)
-// 	if err != nil {
-// 		return 0
-// 	}
-// 	return f
-// }
+type AnnualFinancialReport struct {
+	FinancialYear string
+	Revenue       string
+	Net           string
+	EPS           float64
+	DP            string
+	NetPercent    float64
+	ReportLink    string
+}
+
+func GetAnnualFinancialReports(ctx context.Context, stockCode string) ([]*AnnualFinancialReport, error) {
+	// annual
+	url := financialReportBaseURL + stockCode
+	reports := []*AnnualFinancialReport{}
+
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.Flag("headless", false),
+	)
+	allocCtx, cancel := chromedp.NewExecAllocator(ctx, opts...)
+	defer cancel()
+	chromeCtx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+	var htmlContent string
+	err := chromedp.Run(chromeCtx,
+		chromedp.Navigate(url),
+		chromedp.Sleep(2*time.Second),
+		chromedp.Click(`a[href="#annual"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`div#annual`, chromedp.ByQuery),
+		chromedp.OuterHTML(`div#annual`, &htmlContent, chromedp.ByQuery),
+	)
+	if err != nil {
+		return nil, err
+	}
+	// Use goquery to parse the HTML content and extract the financial report data
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return nil, err
+	}
+	doc.Find(`div#annual table tbody tr`).Each(func(i int, s *goquery.Selection) {
+		// Skip the first row
+		if i == 0 {
+			return
+		}
+		financialYear := trimAndRemoveNewLine(s.Find(`td:nth-child(1)`).Text())
+		revenue := trimAndRemoveNewLine(s.Find(`td:nth-child(2)`).Text())
+		net := trimAndRemoveNewLine(s.Find(`td:nth-child(3)`).Text())
+		eps := parseFloat(s.Find(`td:nth-child(4)`).Text())
+		dp := trimAndRemoveNewLine(s.Find(`td:nth-child(5)`).Text())
+		netPercent := parseFloat(s.Find(`td:nth-child(6)`).Text())
+		reportLink, _ := s.Find(`td:nth-child(7) a`).Attr("href")
+		if reportLink != "" {
+			reportLink = "https://www.klsescreener.com" + reportLink
+		}
+		report := &AnnualFinancialReport{
+			FinancialYear: financialYear,
+			Revenue:       revenue,
+			Net:           net,
+			EPS:           eps,
+			DP:            dp,
+			NetPercent:    netPercent,
+			ReportLink:    reportLink,
+		}
+		reports = append(reports, report)
+	})
+	return reports, nil
+}

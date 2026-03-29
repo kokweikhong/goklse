@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
-	"github.com/chromedp/cdproto/cdp"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/chromedp/chromedp"
 )
 
@@ -14,22 +15,22 @@ const (
 )
 
 type StockListing struct {
-	Code string
-	Name string
-	LongName string
-	Market string
-	Sector string
-	SubSector string
-	Price float64
-	FiftyTwoWeek string
-	Volume int
-	EPS float64
-	DPS float64
-	NTA float64
-	PE float64
-	DY float64
-	ROE float64
-	PTBV float64
+	Code               string
+	Name               string
+	LongName           string
+	Market             string
+	Sector             string
+	SubSector          string
+	Price              float64
+	FiftyTwoWeek       string
+	Volume             int
+	EPS                float64
+	DPS                float64
+	NTA                float64
+	PE                 float64
+	DY                 float64
+	ROE                float64
+	PTBV               float64
 	MarketCapInMillion float64
 }
 
@@ -48,99 +49,77 @@ func GetStockListings(ctx context.Context) ([]*StockListing, error) {
 	defer cancel()
 	chromeCtx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
-	nodes := []*cdp.Node{}
+
+	var htmlContent string
 	err := chromedp.Run(chromeCtx,
 		chromedp.Navigate(stockListingURL),
 		chromedp.WaitVisible(`div#by_conditions`, chromedp.ByQuery),
 		// click input #submit
 		chromedp.Click(`input#submit`, chromedp.ByQuery),
-		chromedp.Sleep(2), // wait for the page to load
-		chromedp.Nodes(`div#result table tbody tr[role="row"]`, &nodes, chromedp.ByQueryAll),
+		chromedp.Sleep(2*time.Second), // wait for the page to load
+		chromedp.WaitVisible(`div#result`, chromedp.ByQuery),
+		chromedp.OuterHTML(`div#result`, &htmlContent, chromedp.ByQuery),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("Number of stock listings found:", len(nodes))
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlContent))
+	if err != nil {
+		return nil, err
+	}
 
-	for nodeIdx, node := range nodes {
-		// Print info and progress
-		fmt.Printf("Processing stock listing: %d/%d\n", nodeIdx+1, len(nodes))
-		var name, code, longName, market, sector, subSector, fiftyTwoWeek,volume,  price, eps, dps, nta, pe, dy, roe, ptbv, marketCapInMillion string
-		chromedp.Run(chromeCtx,
-			chromedp.Text(`td:nth-child(2)`, &code, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(1)`, &name, chromedp.ByQuery, chromedp.FromNode(node)),
-			// Extract the long name from the title attribute of the td:nth-child(1) element
-			chromedp.AttributeValue(`td:nth-child(1)`, "title", &longName, nil, chromedp.ByQuery, chromedp.FromNode(node)),
-			// Market is in td:nth-child(3) last small element and sector is in the first small element
-			chromedp.Text(`td:nth-child(3) small:last-child`, &market, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(3) small:nth-child(1)`, &subSector, chromedp.ByQuery, chromedp.FromNode(node)),
-			// Price is in td:nth-child(4) and needs to be converted to float64
-			chromedp.Text(`td:nth-child(4)`, &price, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(7)`, &fiftyTwoWeek, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(8)`, &volume, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(9)`, &eps, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(10)`, &dps, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(11)`, &nta, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(12)`, &pe, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(13)`, &dy, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(14)`, &roe, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(15)`, &ptbv, chromedp.ByQuery, chromedp.FromNode(node)),
-			chromedp.Text(`td:nth-child(16)`, &marketCapInMillion, chromedp.ByQuery, chromedp.FromNode(node)),
-		)
+	doc.Find(`div#result table tbody tr[role="row"]`).Each(func(i int, s *goquery.Selection) {
+		code := trimAndRemoveNewLine(s.Find(`td:nth-child(2)`).Text())
+		name := trimAndRemoveNewLine(s.Find(`td:nth-child(1)`).Text())
+		// PPB                                                [s], if contains "[s]" then remove [s] and trim space
+		name = strings.ReplaceAll(name, "[s]", "")
+		name = trimAndRemoveNewLine(name)
+		longName, _ := s.Find(`td:nth-child(1)`).Attr("title")
+		market := trimAndRemoveNewLine(s.Find(`td:nth-child(3) small:last-child`).Text())
+		subSector := trimAndRemoveNewLine(s.Find(`td:nth-child(3) small:nth-child(1)`).Text())
+		price := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(4)`).Text()))
+		fiftyTwoWeek := trimAndRemoveNewLine(s.Find(`td:nth-child(7)`).Text())
+		volume := parseInt(trimAndRemoveNewLine(s.Find(`td:nth-child(8)`).Text()))
+		eps := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(9)`).Text()))
+		dps := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(10)`).Text()))
+		nta := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(11)`).Text()))
+		pe := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(12)`).Text()))
+		dy := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(13)`).Text()))
+		roe := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(14)`).Text()))
+		ptbv := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(15)`).Text()))
+		marketCapInMillion := parseFloat(trimAndRemoveNewLine(s.Find(`td:nth-child(16)`).Text()))
 		// Sector is in market text and needs to be extracted using regex
 		// example market text is " Energy, Main Market"
 		// we can split the market text by comma and get the first part as sector
+		sector := ""
 		marketParts := splitAndTrim(market, ",")
 		if len(marketParts) > 0 {
 			sector = marketParts[0]
 			market = marketParts[len(marketParts)-1]
 		}
-
-		// All need to remove new line and trim space
-		// and convert to correct type
-		name = trimAndRemoveNewLine(name)
-		code = trimAndRemoveNewLine(code)
-		longName = trimAndRemoveNewLine(longName)
-		market = trimAndRemoveNewLine(market)
-		sector = trimAndRemoveNewLine(sector)
-		subSector = trimAndRemoveNewLine(subSector)
-		fiftyTwoWeek = trimAndRemoveNewLine(fiftyTwoWeek)
-		volume = trimAndRemoveNewLine(volume)
-		price = trimAndRemoveNewLine(price)
-		eps = trimAndRemoveNewLine(eps)
-		dps = trimAndRemoveNewLine(dps)
-		nta = trimAndRemoveNewLine(nta)
-		pe = trimAndRemoveNewLine(pe)
-		dy = trimAndRemoveNewLine(dy)
-		roe = trimAndRemoveNewLine(roe)
-		ptbv = trimAndRemoveNewLine(ptbv)
-		marketCapInMillion = trimAndRemoveNewLine(marketCapInMillion)
 		stockListings = append(stockListings, &StockListing{
-			Code: code,
-			Name: name,
-			LongName: longName,
-			Market: market,
-			Sector: sector,
-			SubSector: subSector,
-			Price: parseFloat(price),
-			FiftyTwoWeek: fiftyTwoWeek,
-			Volume: parseInt(volume),
-			EPS: parseFloat(eps),
-			DPS: parseFloat(dps),
-			NTA: parseFloat(nta),
-			PE: parseFloat(pe),
-			DY: parseFloat(dy),
-			ROE: parseFloat(roe),
-			PTBV: parseFloat(ptbv),
-			MarketCapInMillion: parseFloat(marketCapInMillion),
+			Code:               code,
+			Name:               name,
+			LongName:           longName,
+			Market:             market,
+			Sector:             sector,
+			SubSector:          subSector,
+			Price:              price,
+			FiftyTwoWeek:       fiftyTwoWeek,
+			Volume:             volume,
+			EPS:                eps,
+			DPS:                dps,
+			NTA:                nta,
+			PE:                 pe,
+			DY:                 dy,
+			ROE:                roe,
+			PTBV:               ptbv,
+			MarketCapInMillion: marketCapInMillion,
 		})
-	}
+	})
 
 	fmt.Printf("Extracted %d stock listings\n", len(stockListings))
-
-
-
 
 	return stockListings, nil
 
