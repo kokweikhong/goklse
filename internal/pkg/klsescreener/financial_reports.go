@@ -60,10 +60,10 @@ func GetQuarterlyFinancialReports(ctx context.Context, stockCode string) ([]*Qua
 		if colspan, exists := s.Find(`td:nth-child(1)`).Attr("colspan"); exists && colspan == "100" {
 			return
 		}
-		eps := parseFloat(s.Find(`td:nth-child(1)`).Text())
-		dps := parseFloat(s.Find(`td:nth-child(2)`).Text())
-		nta := parseFloat(s.Find(`td:nth-child(3)`).Text())
-		pl := parseFloat(s.Find(`td:nth-child(4)`).Text())
+		eps := parseFloat(removeCommaForNumber(s.Find(`td:nth-child(1)`).Text()))
+		dps := parseFloat(removeCommaForNumber(s.Find(`td:nth-child(2)`).Text()))
+		nta := parseFloat(removeCommaForNumber(s.Find(`td:nth-child(3)`).Text()))
+		pl := parseFloat(removeCommaForNumber(s.Find(`td:nth-child(4)`).Text()))
 		quarter := trimAndRemoveNewLine(s.Find(`td:nth-child(5)`).Text())
 		qDate := trimAndRemoveNewLine(s.Find(`td:nth-child(6)`).Text())
 		financialYear := trimAndRemoveNewLine(s.Find(`td:nth-child(7)`).Text())
@@ -94,11 +94,11 @@ func GetQuarterlyFinancialReports(ctx context.Context, stockCode string) ([]*Qua
 
 type AnnualFinancialReport struct {
 	FinancialYear string
-	Revenue       string
-	Net           string
+	Revenue       float64
+	Net           float64
 	EPS           float64
 	DP            string
-	NetPercent    float64
+	NetPercent    string
 	ReportLink    string
 }
 
@@ -136,11 +136,12 @@ func GetAnnualFinancialReports(ctx context.Context, stockCode string) ([]*Annual
 			return
 		}
 		financialYear := trimAndRemoveNewLine(s.Find(`td:nth-child(1)`).Text())
-		revenue := trimAndRemoveNewLine(s.Find(`td:nth-child(2)`).Text())
-		net := trimAndRemoveNewLine(s.Find(`td:nth-child(3)`).Text())
-		eps := parseFloat(s.Find(`td:nth-child(4)`).Text())
-		dp := trimAndRemoveNewLine(s.Find(`td:nth-child(5)`).Text())
-		netPercent := parseFloat(s.Find(`td:nth-child(6)`).Text())
+		// all float need to try to remove comma before parse
+		revenue := parseFloat(removeCommaForNumber(s.Find(`td:nth-child(2)`).Text()))
+		net := parseFloat(removeCommaForNumber(s.Find(`td:nth-child(3)`).Text()))
+		eps := parseFloat(removeCommaForNumber(s.Find(`td:nth-child(4)`).Text()))
+		dp := trimAndRemoveNewLine(s.Find(`.number:nth-child(5)`).Text())
+		netPercent := trimAndRemoveNewLine(s.Find(`.number:nth-child(6)`).Text())
 		reportLink, _ := s.Find(`td:nth-child(7) a`).Attr("href")
 		if reportLink != "" {
 			reportLink = "https://www.klsescreener.com" + reportLink
@@ -157,4 +158,8 @@ func GetAnnualFinancialReports(ctx context.Context, stockCode string) ([]*Annual
 		reports = append(reports, report)
 	})
 	return reports, nil
+}
+
+func removeCommaForNumber(s string) string {
+	return strings.ReplaceAll(s, ",", "")
 }

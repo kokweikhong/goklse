@@ -16,12 +16,12 @@ const (
 )
 
 type StockPrice struct {
-	Date   string
-	Open   float64
-	High   float64
-	Low    float64
-	Close  float64
-	Volume int
+	Timestamp int64
+	Open      float64
+	High      float64
+	Low       float64
+	Close     float64
+	Volume    int
 }
 
 func GetHistoricalStockPrices(ctx context.Context, stockCode string) ([]*StockPrice, error) {
@@ -89,12 +89,12 @@ func GetHistoricalStockPrices(ctx context.Context, stockCode string) ([]*StockPr
 				continue
 			}
 			prices = append(prices, &StockPrice{
-				Date:   fmt.Sprintf("%v", priceEntry[0]),
-				Open:   priceEntry[1].(float64),
-				High:   priceEntry[2].(float64),
-				Low:    priceEntry[3].(float64),
-				Close:  priceEntry[4].(float64),
-				Volume: int(priceEntry[5].(float64)),
+				Timestamp: int64(priceEntry[0].(float64)),
+				Open:      priceEntry[1].(float64),
+				High:      priceEntry[2].(float64),
+				Low:       priceEntry[3].(float64),
+				Close:     priceEntry[4].(float64),
+				Volume:    int(priceEntry[5].(float64)),
 			})
 		}
 	}

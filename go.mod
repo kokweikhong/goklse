@@ -4,13 +4,14 @@ go 1.26
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
-	github.com/chromedp/cdproto v0.0.0-20260328224638-b7b298a31867
 	github.com/chromedp/chromedp v0.15.1
 	github.com/stretchr/testify v1.11.1
+	github.com/urfave/cli/v3 v3.8.0
 )
 
 require (
 	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/chromedp/cdproto v0.0.0-20260328224638-b7b298a31867 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433 // indirect
