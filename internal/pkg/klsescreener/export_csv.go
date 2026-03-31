@@ -124,3 +124,25 @@ func ExportAnnualFinancialReportsToCSV(ctx context.Context, reports []*AnnualFin
 	}
 	return nil
 }
+
+func ExportKLCIComponentStocksToCSV(ctx context.Context, stocks []*ComponentStock, filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	// Write the header
+	writer.Write([]string{"Name", "Code", "MarketCap", "Category"})
+	// Write the component stocks
+	for _, stock := range stocks {
+		writer.Write([]string{
+			stock.Name,
+			stock.Code,
+			stock.MarketCap,
+			stock.Category,
+		})
+	}
+	return nil
+}

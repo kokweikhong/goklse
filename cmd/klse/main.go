@@ -242,6 +242,39 @@ func main() {
 					return nil
 				},
 			},
+
+			// Get KLCI component stocks from KLSE Screener
+			{
+				Name:    "get-klci-component-stocks",
+				Aliases: []string{"gklcics"},
+				Usage:   "Get KLCI component stocks from KLSE Screener",
+				Flags: []cli.Flag{
+					&cli.BoolFlag{
+						Name:    "export-csv",
+						Aliases: []string{"csv"},
+						Usage:   "Export KLCI component stocks to klci_component_stocks.csv",
+					},
+				},
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					stocks, err := klsescreener.GetKLCIComponentStocks(ctx)
+					if err != nil {
+						return err
+					}
+					for _, stock := range stocks {
+						fmt.Println(stock.Name, stock.Code, stock.MarketCap, stock.Category)
+					}
+					if cmd.Bool("export-csv") {
+						filename := fmt.Sprintf("klci_component_stocks_%s.csv", time.Now().Format("20060102_150405"))
+						err := klsescreener.ExportKLCIComponentStocksToCSV(ctx, stocks, filename)
+						if err != nil {
+							return err
+						}
+						fmt.Println("KLCI component stocks exported to", filename)
+					}
+
+					return nil
+				},
+			},
 		},
 	}
 
